@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 
 from django.db import transaction
@@ -8,7 +9,7 @@ from .models import Bill, Building, FeeType, Payment, Reminder, Room
 
 
 def make_number(prefix):
-    return f"{prefix}{timezone.now().strftime('%Y%m%d%H%M%S%f')}"
+    return f"{prefix}{timezone.now().strftime('%Y%m%d%H%M%S%f')}{uuid.uuid4().hex[:4]}"
 
 
 @transaction.atomic
@@ -41,11 +42,16 @@ def generate_bills(fee_type_id, period, due_date, room_ids=None):
 
 
 @transaction.atomic
-def pay_bill(bill, method, payer=""):
+def pay_bill(bill, method, payer="", payee=""):
     if bill.status == Bill.PAID:
         raise ValueError("该账单已缴费")
     if bill.status == Bill.CANCELLED:
         raise ValueError("作废账单不能缴费")
+
+    while True:
+        receipt_no = make_number("R")
+        if not Payment.objects.filter(receipt_no=receipt_no).exists():
+            break
 
     payment = Payment.objects.create(
         payment_no=make_number("P"),
@@ -53,7 +59,8 @@ def pay_bill(bill, method, payer=""):
         amount=bill.amount,
         method=method,
         payer=payer or bill.room.owner_name,
-        receipt_no=make_number("R"),
+        payee=payee or "小区物业服务中心",
+        receipt_no=receipt_no,
     )
     bill.status = Bill.PAID
     bill.paid_at = payment.paid_at

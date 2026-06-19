@@ -12,6 +12,8 @@ export const propertyApi = {
   generateBills: (payload) => http.post("/bills/generate/", payload).then(unwrap),
   payBill: (id, payload) => http.post(`/bills/${id}/pay/`, payload).then(unwrap),
   listPayments: () => http.get("/payments/").then(unwrap),
+  listReceipts: (params = {}) => http.get("/receipts/", { params }).then(unwrap),
+  getReceipt: (id) => http.get(`/receipts/${id}/`).then(unwrap),
   listReminders: () => http.get("/reminders/").then(unwrap),
   createOverdueReminders: (payload) => http.post("/reminders/create_overdue/", payload).then(unwrap)
 };

@@ -132,6 +132,7 @@ class Payment(models.Model):
     method = models.CharField("支付方式", max_length=20, choices=METHOD_CHOICES, default=WECHAT)
     paid_at = models.DateTimeField("支付时间", default=timezone.now)
     payer = models.CharField("付款人", max_length=50, blank=True)
+    payee = models.CharField("收款人", max_length=50, default="小区物业服务中心")
     receipt_no = models.CharField("票据编号", max_length=40, unique=True)
 
     class Meta:

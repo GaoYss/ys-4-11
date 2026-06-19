@@ -16,7 +16,6 @@ from .serializers import (
 )
 from .services import create_overdue_reminders, dashboard_stats, generate_bills, pay_bill
 
-
 class BuildingViewSet(viewsets.ModelViewSet):
     queryset = Building.objects.annotate(room_count=Count("rooms")).all()
     serializer_class = BuildingSerializer
@@ -81,7 +80,12 @@ class BillViewSet(viewsets.ModelViewSet):
     def pay(self, request, pk=None):
         bill = self.get_object()
         try:
-            payment = pay_bill(bill, request.data.get("method", Payment.WECHAT), request.data.get("payer", ""))
+            payment = pay_bill(
+                bill,
+                request.data.get("method", Payment.WECHAT),
+                request.data.get("payer", ""),
+                request.data.get("payee", ""),
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
@@ -94,7 +98,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         bill = get_object_or_404(Bill.objects.select_related("room"), pk=request.data.get("bill"))
         try:
-            payment = pay_bill(bill, request.data.get("method", Payment.WECHAT), request.data.get("payer", ""))
+            payment = pay_bill(
+                bill,
+                request.data.get("method", Payment.WECHAT),
+                request.data.get("payer", ""),
+                request.data.get("payee", ""),
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self.get_serializer(payment).data, status=status.HTTP_201_CREATED)
@@ -118,3 +127,18 @@ def dashboard(request):
     stats = dashboard_stats()
     recent = BillSerializer(stats.pop("recent_bills"), many=True).data
     return Response({**stats, "recent_bills": recent})
+
+
+class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Payment.objects.select_related("bill", "bill__room", "bill__room__building", "bill__fee_type").all()
+    serializer_class = PaymentSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        receipt_no = self.request.query_params.get("receipt_no")
+        period = self.request.query_params.get("period")
+        if receipt_no:
+            queryset = queryset.filter(receipt_no__icontains=receipt_no)
+        if period:
+            queryset = queryset.filter(bill__period=period)
+        return queryset
